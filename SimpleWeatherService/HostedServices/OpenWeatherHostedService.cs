@@ -49,7 +49,7 @@ namespace SimpleWeatherService.HostedServices
             report.Hourly.ForEach(hourlyReport => hourlyReport.DateTime = hourlyReport.DateTime.AddSeconds(report.TimeZoneOffset));
             var deltas = new Dictionary<string, ValueTuple<int, int>>()
             {
-                { "morning", (5, 8) },
+                { "morning", (5, 7) },
                 { "afternoon", (12, 14) },
                 { "evening", (17, 19) },
             };
@@ -77,8 +77,8 @@ namespace SimpleWeatherService.HostedServices
                 var date = partOfDayReports.FirstOrDefault()!.DateTime.Date;
                 if (intersect.Any())
                 {
-                    var weatherCondition = string.Join(", ", intersect);
-                    await SendMessage($"[{date.ToString("M")}] In {partOfDay} there will be {weatherCondition} between {deltas[partOfDay].Item1} and {deltas[partOfDay].Item2} o'clock");
+                    var weatherCondition = string.Join(", ", intersect).ToLower();
+                    await SendMessage($"[{date.ToString("M")}] In the {partOfDay} there will be {weatherCondition} between {deltas[partOfDay].Item1} and {deltas[partOfDay].Item2} o'clock");
                 }
             }
         }
