@@ -91,7 +91,7 @@ namespace SimpleWeatherService.HostedServices
 
             var bot = new TelegramBotClient(telegramToken);
 
-            await bot.SendMessage("388703389", message);
+            await bot.SendMessage("-4568320372", message);
         }
     }
 }
