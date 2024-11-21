@@ -89,7 +89,7 @@ namespace SimpleWeatherService.HostedServices
                 var date = partOfDayReports.FirstOrDefault()!.DateTime.Date;
                 if (!intersect.Any())
                 {
-                    this.logger.LogInformation($"For {partOfDay} there was not special weather conditions.");
+                    this.logger.LogInformation($"For {partOfDay} of {date.ToString("M")} there was not special weather conditions.");
                     continue;
                 }
 
