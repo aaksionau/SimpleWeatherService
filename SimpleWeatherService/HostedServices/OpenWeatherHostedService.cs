@@ -1,4 +1,5 @@
 ﻿using Azure.Communication.Sms;
+using Microsoft.Extensions.Caching.Memory;
 using SimpleWeatherService.Interfaces;
 using System.Collections.Generic;
 using Telegram.Bot;
@@ -10,17 +11,21 @@ namespace SimpleWeatherService.HostedServices
         private readonly ILogger<OpenWeatherHostedService> logger;
         private readonly IOpenWeatherService openWeatherService;
         private readonly IConfiguration configuration;
+        private readonly IMemoryCache memoryCache;
+
         private double lat = 44.8297118;
         private double lon = -92.9151719;
 
         public OpenWeatherHostedService(
             ILogger<OpenWeatherHostedService> logger,
             IOpenWeatherService openWeatherService, 
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IMemoryCache memoryCache)
         {
             this.logger = logger;
             this.openWeatherService = openWeatherService;
             this.configuration = configuration;
+            this.memoryCache = memoryCache;
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -66,7 +71,10 @@ namespace SimpleWeatherService.HostedServices
 
             foreach (var partOfDay in deltas.Keys)
             {
-                var partOfDayReports = next24Hours.Where(x => x.DateTime.Hour >= deltas[partOfDay].Item1 && x.DateTime.Hour <= deltas[partOfDay].Item2);
+                var partOfDayReports = next24Hours.Where(
+                    x => x.DateTime.Hour >= deltas[partOfDay].Item1 
+                    && x.DateTime.Hour <= deltas[partOfDay].Item2);
+
                 if (!partOfDayReports.Any()) continue;
 
                 var mainWeatherConditions = partOfDayReports
@@ -75,10 +83,18 @@ namespace SimpleWeatherService.HostedServices
 
                 var intersect = mainWeatherConditions.Intersect(weatherConditions);
                 var date = partOfDayReports.FirstOrDefault()!.DateTime.Date;
-                if (intersect.Any())
+                if (!intersect.Any())
                 {
-                    var weatherCondition = string.Join(", ", intersect).ToLower();
-                    await SendMessage($"[{date.ToString("M")}] In the {partOfDay} there will be {weatherCondition} between {deltas[partOfDay].Item1} and {deltas[partOfDay].Item2} o'clock");
+                    continue;
+                }
+
+                var weatherCondition = string.Join(", ", intersect).ToLower();
+                var key = $"{date.ToString("M")}-{deltas[partOfDay].Item1}-{deltas[partOfDay].Item2}";
+                if (!this.memoryCache.TryGetValue(key, out bool value))
+                {
+                    string message = $"[{date.ToString("M")}] In the {partOfDay} there will be {weatherCondition} between {deltas[partOfDay].Item1} and {deltas[partOfDay].Item2} o'clock";
+                    await SendMessage(message);
+                    this.memoryCache.Set(key, true);
                 }
             }
         }

@@ -13,6 +13,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IOpenWeatherService, OpenWeatherService>();
 builder.Services.AddHostedService<OpenWeatherHostedService>();
 builder.Services.Configure<OpenWeatherSettings>(builder.Configuration.GetSection("OpenWeatherSettings"));
+builder.Services.AddMemoryCache();
 
 builder.Services.AddHttpClient("WeatherAPI", options =>
 {
