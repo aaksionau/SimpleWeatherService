@@ -75,7 +75,11 @@ namespace SimpleWeatherService.HostedServices
                     x => x.DateTime.Hour >= deltas[partOfDay].Item1 
                     && x.DateTime.Hour <= deltas[partOfDay].Item2);
 
-                if (!partOfDayReports.Any()) continue;
+                if (!partOfDayReports.Any())
+                {
+                    this.logger.LogInformation($"There is no data for requested hours.");
+                    continue;
+                }
 
                 var mainWeatherConditions = partOfDayReports
                                                             .Where(x => x.Weather.FirstOrDefault() != null)
@@ -85,6 +89,7 @@ namespace SimpleWeatherService.HostedServices
                 var date = partOfDayReports.FirstOrDefault()!.DateTime.Date;
                 if (!intersect.Any())
                 {
+                    this.logger.LogInformation($"For {partOfDay} there was not special weather conditions.");
                     continue;
                 }
 
@@ -108,6 +113,7 @@ namespace SimpleWeatherService.HostedServices
             var bot = new TelegramBotClient(telegramToken);
 
             await bot.SendMessage("-4568320372", message);
+            this.logger.LogInformation($"Message was sent: {message}");
         }
     }
 }
