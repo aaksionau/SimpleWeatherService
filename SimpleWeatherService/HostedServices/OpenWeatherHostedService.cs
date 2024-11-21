@@ -1,7 +1,5 @@
-﻿using Azure.Communication.Sms;
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 using SimpleWeatherService.Interfaces;
-using System.Collections.Generic;
 using Telegram.Bot;
 
 namespace SimpleWeatherService.HostedServices
@@ -18,7 +16,7 @@ namespace SimpleWeatherService.HostedServices
 
         public OpenWeatherHostedService(
             ILogger<OpenWeatherHostedService> logger,
-            IOpenWeatherService openWeatherService, 
+            IOpenWeatherService openWeatherService,
             IConfiguration configuration,
             IMemoryCache memoryCache)
         {
@@ -72,7 +70,7 @@ namespace SimpleWeatherService.HostedServices
             foreach (var partOfDay in deltas.Keys)
             {
                 var partOfDayReports = next24Hours.Where(
-                    x => x.DateTime.Hour >= deltas[partOfDay].Item1 
+                    x => x.DateTime.Hour >= deltas[partOfDay].Item1
                     && x.DateTime.Hour <= deltas[partOfDay].Item2);
 
                 if (!partOfDayReports.Any())
