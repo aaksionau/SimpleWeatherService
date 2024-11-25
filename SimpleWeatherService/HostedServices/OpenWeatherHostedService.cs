@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using SimpleWeatherService.Interfaces;
+using SimpleWeatherService.Models;
 using Telegram.Bot;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace SimpleWeatherService.HostedServices
 {
@@ -10,6 +12,10 @@ namespace SimpleWeatherService.HostedServices
         private readonly IOpenWeatherService openWeatherService;
         private readonly IConfiguration configuration;
         private readonly IMemoryCache memoryCache;
+        private List<string> weatherConditions;
+        private Dictionary<string, ValueTuple<int, int>> tempDeltas;
+        private List<int> lowTemps;
+        private List<int> highTemps;
 
         private double lat = 44.8297118;
         private double lon = -92.9151719;
@@ -24,6 +30,40 @@ namespace SimpleWeatherService.HostedServices
             this.openWeatherService = openWeatherService;
             this.configuration = configuration;
             this.memoryCache = memoryCache;
+
+            this.tempDeltas = new Dictionary<string, ValueTuple<int, int>>()
+            {
+                { "morning", (5, 7) },
+                { "afternoon", (12, 14) },
+                { "evening", (17, 19) },
+            };
+
+
+            this.weatherConditions = new List<string>()
+            {
+                "Thunderstorm",
+                "Rain",
+                "Snow",
+                "Fog",
+                "Tornado"
+            };
+
+            this.lowTemps = new List<int>()
+            {
+                2,
+                12,
+                22,
+                32
+            };
+
+            this.highTemps = new List<int>()
+            {
+                62,
+                72,
+                82,
+                92,
+                102
+            };
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -50,55 +90,74 @@ namespace SimpleWeatherService.HostedServices
         {
             var report = await this.openWeatherService.GetWeatherForCoordinatesAsync(lat, lon);
             report.Hourly.ForEach(hourlyReport => hourlyReport.DateTime = hourlyReport.DateTime.AddSeconds(report.TimeZoneOffset));
-            var deltas = new Dictionary<string, ValueTuple<int, int>>()
-            {
-                { "morning", (5, 7) },
-                { "afternoon", (12, 14) },
-                { "evening", (17, 19) },
-            };
 
-            var weatherConditions = new List<string>()
-            {
-                "Thunderstorm",
-                "Rain",
-                "Snow",
-                "Fog",
-                "Tornado"
-            };
             var next24Hours = report.Hourly.Take(24).ToList();
 
-            foreach (var partOfDay in deltas.Keys)
+            foreach (var partOfDay in this.tempDeltas.Keys)
             {
                 var partOfDayReports = next24Hours.Where(
-                    x => x.DateTime.Hour >= deltas[partOfDay].Item1
-                    && x.DateTime.Hour <= deltas[partOfDay].Item2);
+                    x => x.DateTime.Hour >= this.tempDeltas[partOfDay].Item1
+                    && x.DateTime.Hour <= this.tempDeltas[partOfDay].Item2);
 
                 if (!partOfDayReports.Any())
                 {
                     this.logger.LogInformation($"There is no data for requested hours.");
-                    continue;
+                    return;
                 }
 
-                var mainWeatherConditions = partOfDayReports
-                                                            .Where(x => x.Weather.FirstOrDefault() != null)
-                                                            .Select(x => x.Weather.FirstOrDefault()!.Main);
+                await this.NotifyAboutMainWeatherConditionsAsync(partOfDay, partOfDayReports);
+                await this.NotifyAboutTemperatureAsync(partOfDay, partOfDayReports);
+            }
+        }
 
-                var intersect = mainWeatherConditions.Intersect(weatherConditions);
-                var date = partOfDayReports.FirstOrDefault()!.DateTime.Date;
-                if (!intersect.Any())
-                {
-                    this.logger.LogInformation($"For {partOfDay} of {date.ToString("M")} there was not special weather conditions.");
-                    continue;
-                }
+        private async Task NotifyAboutTemperatureAsync(string partOfDay, IEnumerable<HourlyWeatherReportDto> partOfDayReports)
+        {
+            var partOfDayAvgTemp = partOfDayReports.Average(x => x.Temp);
+            var lowerTemps = lowTemps.Where(x => x <= partOfDayAvgTemp);
 
-                var weatherCondition = string.Join(", ", intersect).ToLower();
-                var key = $"{date.ToString("M")}-{deltas[partOfDay].Item1}-{deltas[partOfDay].Item2}";
-                if (!this.memoryCache.TryGetValue(key, out bool value))
-                {
-                    string message = $"[{date.ToString("M")}] In the {partOfDay} there will be {weatherCondition} between {deltas[partOfDay].Item1} and {deltas[partOfDay].Item2} o'clock";
-                    await SendMessage(message);
-                    this.memoryCache.Set(key, true);
-                }
+            var lowTemp = lowTemps.Except(lowerTemps);
+            var date = partOfDayReports.FirstOrDefault()!.DateTime.Date;
+
+            var key = $"{date.ToString("M")}-{this.tempDeltas[partOfDay].Item1}-{this.tempDeltas[partOfDay].Item2}-temp";
+            if (lowTemp.Any() && !this.memoryCache.TryGetValue(key, out bool _))
+            {
+                string message = $"[{date.ToString("M")}] In the {partOfDay} temperature will be lower than {lowTemp.FirstOrDefault()} °F between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock. The temperature will be around {partOfDayAvgTemp} °F";
+                await SendMessage(message);
+                this.memoryCache.Set(key, true);
+            }
+
+            var higherTemps = highTemps.Where(x => x >= partOfDayAvgTemp);
+            var highTemp = highTemps.Except(highTemps);
+
+            if (highTemp.Any() && !this.memoryCache.TryGetValue(key, out bool _))
+            {
+                string message = $"[{date.ToString("M")}] In the {partOfDay} temperature will be higher than {highTemp.FirstOrDefault()} °F between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock. The temperature will be around {partOfDayAvgTemp} °F";
+                await SendMessage(message);
+                this.memoryCache.Set(key, true);
+            }
+        }
+
+        private async Task NotifyAboutMainWeatherConditionsAsync(string partOfDay, IEnumerable<HourlyWeatherReportDto> partOfDayReports)
+        {
+            var mainWeatherConditions = partOfDayReports
+                                                        .Where(x => x.Weather.FirstOrDefault() != null)
+                                                        .Select(x => x.Weather.FirstOrDefault()!.Main);
+
+            var intersect = mainWeatherConditions.Intersect(this.weatherConditions);
+            var date = partOfDayReports.FirstOrDefault()!.DateTime.Date;
+            if (!intersect.Any())
+            {
+                this.logger.LogInformation($"For {partOfDay} of {date.ToString("M")} there was not special weather conditions.");
+                return;
+            }
+
+            var weatherCondition = string.Join(", ", intersect).ToLower();
+            var key = $"{date.ToString("M")}-{this.tempDeltas[partOfDay].Item1}-{this.tempDeltas[partOfDay].Item2}-condition";
+            if (!this.memoryCache.TryGetValue(key, out bool _))
+            {
+                string message = $"[{date.ToString("M")}] In the {partOfDay} there will be {weatherCondition} between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock";
+                await SendMessage(message);
+                this.memoryCache.Set(key, true);
             }
         }
 
