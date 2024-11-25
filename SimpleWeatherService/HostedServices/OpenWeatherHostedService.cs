@@ -33,7 +33,7 @@ namespace SimpleWeatherService.HostedServices
 
             this.tempDeltas = new Dictionary<string, ValueTuple<int, int>>()
             {
-                { "morning", (5, 7) },
+                { "morning", (6, 8) },
                 { "afternoon", (12, 14) },
                 { "evening", (17, 19) },
             };
@@ -121,7 +121,7 @@ namespace SimpleWeatherService.HostedServices
             var key = $"{date.ToString("M")}-{this.tempDeltas[partOfDay].Item1}-{this.tempDeltas[partOfDay].Item2}-temp";
             if (lowTemp.Any() && !this.memoryCache.TryGetValue(key, out bool _))
             {
-                string message = $"[{date.ToString("M")}] In the {partOfDay} temperature will be lower than {lowTemp.FirstOrDefault()} °F between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock. The temperature will be around {partOfDayAvgTemp} °F";
+                string message = $"[{date.ToString("M")}] In the {partOfDay} temperature will be around {partOfDayAvgTemp.ToString("0.0")}°F (lower than {lowTemp.FirstOrDefault()}°F) between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock.";
                 await SendMessage(message);
                 this.memoryCache.Set(key, true);
             }
@@ -131,7 +131,7 @@ namespace SimpleWeatherService.HostedServices
 
             if (highTemp.Any() && !this.memoryCache.TryGetValue(key, out bool _))
             {
-                string message = $"[{date.ToString("M")}] In the {partOfDay} temperature will be higher than {highTemp.FirstOrDefault()} °F between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock. The temperature will be around {partOfDayAvgTemp} °F";
+                string message = $"[{date.ToString("M")}] In the {partOfDay} temperature will be around {partOfDayAvgTemp.ToString("0.0")}°F (higher than {highTemp.FirstOrDefault()}°F) between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock.";
                 await SendMessage(message);
                 this.memoryCache.Set(key, true);
             }
