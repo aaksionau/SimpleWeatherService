@@ -119,9 +119,10 @@ namespace SimpleWeatherService.HostedServices
             var date = partOfDayReports.FirstOrDefault()!.DateTime.Date;
 
             var key = $"{date.ToString("M")}-{this.tempDeltas[partOfDay].Item1}-{this.tempDeltas[partOfDay].Item2}-temp";
+            var day = date.ToString("d") == DateTime.Now.Date.ToString("d") ? "Today" : "Tomorrow";
             if (lowTemp.Any() && !this.memoryCache.TryGetValue(key, out bool _))
             {
-                string message = $"[{date.ToString("M")}] In the {partOfDay} temperature will be around {partOfDayAvgTemp.ToString("0.0")}°F (lower than {lowTemp.FirstOrDefault()}°F) between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock.";
+                string message = $"{day} in the {partOfDay} temperature will be around {partOfDayAvgTemp.ToString("0.0")}°F";
                 await SendMessage(message);
                 this.memoryCache.Set(key, true);
             }
@@ -131,7 +132,7 @@ namespace SimpleWeatherService.HostedServices
 
             if (highTemp.Any() && !this.memoryCache.TryGetValue(key, out bool _))
             {
-                string message = $"[{date.ToString("M")}] In the {partOfDay} temperature will be around {partOfDayAvgTemp.ToString("0.0")}°F (higher than {highTemp.FirstOrDefault()}°F) between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock.";
+                string message = $"{day} in the {partOfDay} temperature will be around {partOfDayAvgTemp.ToString("0.0")}°F";
                 await SendMessage(message);
                 this.memoryCache.Set(key, true);
             }
@@ -152,10 +153,11 @@ namespace SimpleWeatherService.HostedServices
             }
 
             var weatherCondition = string.Join(", ", intersect).ToLower();
+            var day = date.ToString("d") == DateTime.Now.Date.ToString("d") ? "Today" : "Tomorrow";
             var key = $"{date.ToString("M")}-{this.tempDeltas[partOfDay].Item1}-{this.tempDeltas[partOfDay].Item2}-condition";
             if (!this.memoryCache.TryGetValue(key, out bool _))
             {
-                string message = $"[{date.ToString("M")}] In the {partOfDay} there will be {weatherCondition} between {this.tempDeltas[partOfDay].Item1} and {this.tempDeltas[partOfDay].Item2} o'clock";
+                string message = $"{day} in the {partOfDay} there will be {weatherCondition}";
                 await SendMessage(message);
                 this.memoryCache.Set(key, true);
             }
